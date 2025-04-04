@@ -1,4 +1,4 @@
-package week1;
+package tp;
 
 import javax.swing.JFrame;
 import javax.swing.JLabel;
