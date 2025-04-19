@@ -44,7 +44,7 @@
                 <archive>
                     <manifest>
                         <addClasspath>true</addClasspath>
-                        <mainClass>com.example.tp1.Main</mainClass>
+                        <mainClass>tp.Main</mainClass>
                     </manifest>
                 </archive>
             </configuration>
