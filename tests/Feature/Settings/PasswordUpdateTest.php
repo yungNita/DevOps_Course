@@ -13,13 +13,15 @@ class PasswordUpdateTest extends TestCase
 
     public function test_password_can_be_updated()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'password' => bcrypt('password'), // Set known initial password
+        ]);
 
         $response = $this
             ->actingAs($user)
             ->from('/settings/password')
             ->put('/settings/password', [
-                'current_password' => 'password',
+                'current_password' => 'password', // Matches the known password
                 'password' => 'new-password',
                 'password_confirmation' => 'new-password',
             ]);
@@ -33,13 +35,15 @@ class PasswordUpdateTest extends TestCase
 
     public function test_correct_password_must_be_provided_to_update_password()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'password' => bcrypt('password'), // Same here
+        ]);
 
         $response = $this
             ->actingAs($user)
             ->from('/settings/password')
             ->put('/settings/password', [
-                'current_password' => 'wrong-password',
+                'current_password' => 'wrong-password', // Wrong password on purpose
                 'password' => 'new-password',
                 'password_confirmation' => 'new-password',
             ]);
