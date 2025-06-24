@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laravel-deployment
+  labels:
+    app: laravel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: laravel
+  template:
+    metadata:
+      labels:
+        app: laravel
+    spec:
+      containers:
+      - name: web
+        image: laravel-nginx-app:1.0  
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 22
+          name: ssh
+        volumeMounts:
+        - name: app-volume
+          mountPath: /var/www/html
+        env:
+        - name: DB_HOST
+          value: "localhost" 
+        - name: DB_DATABASE
+          value: "yungnita"
+        - name: DB_USERNAME
+          value: "yungnita"
+        - name: DB_PASSWORD
+          value: "Hello@123"
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "Hello@123"
+        - name: MYSQL_DATABASE
+          value: "yungnita"
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        resources:
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+
+      volumes:
+      - name: app-volume
+        emptyDir: {}
+      - name: mysql-data
+        emptyDir: {} 
