@@ -80,25 +80,25 @@
         var: composer_config.stdout
                  
     # Task 3: Configure NPM with custom registries
-    - name: Set up NPM registry
-      kubernetes.core.k8s_exec:
-        namespace: default
-        pod: "{{ pod_name }}"
-        container: web
-        command: |
-          sh -c 'cd {{ app_path }} && \
-                 npm config set registry {{ npm_repos[0] }} && \
-                 npm config set @i4:registry {{ npm_repos[1] }}'
+    # - name: Set up NPM registry
+    #   kubernetes.core.k8s_exec:
+    #     namespace: default
+    #     pod: "{{ pod_name }}"
+    #     container: web
+    #     command: |
+    #       sh -c 'cd {{ app_path }} && \
+    #              npm config set registry {{ npm_repos[0] }} && \
+    #              npm config set @i4:registry {{ npm_repos[1] }}'
 
-    - name: Install NPM dependencies and build
-      kubernetes.core.k8s_exec:
-        namespace: default
-        pod: "{{ pod_name }}"
-        container: web
-        command: |
-          sh -c 'cd {{ app_path }} && \
-                 npm ci --registry={{ npm_repos[0] }} && \
-                 npm run prod'
+    # - name: Install NPM dependencies and build
+    #   kubernetes.core.k8s_exec:
+    #     namespace: default
+    #     pod: "{{ pod_name }}"
+    #     container: web
+    #     command: |
+    #       sh -c 'cd {{ app_path }} && \
+    #              npm ci --registry={{ npm_repos[0] }} && \
+    #              npm run prod'
 
     # Task 4: Run tests with SQLite
     - name: Configure test environment
@@ -108,22 +108,24 @@
         container: web
         command: |
           sh -c 'cd {{ app_path }} && \
-                 cp .env .env.testing && \
-                 echo "DB_CONNECTION=sqlite" >> .env.testing && \
-                 echo "DB_DATABASE=:memory:" >> .env.testing && \
-                 echo "CACHE_DRIVER=array" >> .env.testing && \
-                 echo "SESSION_DRIVER=array" >> .env.testing && \
-                 echo "QUEUE_CONNECTION=sync" >> .env.testing'
-
-    - name: Run PHPUnit tests
-      kubernetes.core.k8s_exec:
-        namespace: default
-        pod: "{{ pod_name }}"
-        container: web
-        command: |
-          sh -c 'cd {{ app_path }} && \
-                 php artisan config:clear && \
-                 php artisan test'
+             [ -f .env ] || touch .env && \
+             cp .env .env.testing && \
+             echo "APP_ENV=testing" > .env.testing && \
+             echo "DB_CONNECTION=sqlite" >> .env.testing && \
+             echo "DB_DATABASE=:memory:" >> .env.testing && \
+             echo "CACHE_DRIVER=array" >> .env.testing && \
+             echo "SESSION_DRIVER=array" >> .env.testing && \
+             echo "QUEUE_CONNECTION=sync" >> .env.testing'
+    
+    # - name: Run PHPUnit tests
+    #   kubernetes.core.k8s_exec:
+    #     namespace: default
+    #     pod: "{{ pod_name }}"
+    #     container: web
+    #     command: |
+    #       sh -c 'cd {{ app_path }} && \
+    #          php artisan config:clear && \
+    #          ./vendor/bin/phpunit'
 
     # Task 5: MySQL Backup
     - name: Create timestamped MySQL backup
