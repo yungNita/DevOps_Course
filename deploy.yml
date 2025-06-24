@@ -1,0 +1,140 @@
+---
+- name: Deploy Laravel Application with Custom Repos
+  hosts: localhost
+  connection: local
+  vars:
+    pod_name: "laravel-deployment-69474b8b7-5shd2"
+    kube_config: "~/.kube/config"
+    app_path: "/var/www/html"
+    git_branch: "Final"
+    ansible_python_interpreter: "{{ lookup('env', 'VIRTUAL_ENV') }}/bin/python"
+    composer_repo: "http://203.95.199.55:8081/repository/composer-proxy-i4/"
+    
+    # Custom repository URLs
+    maven_repos:
+      - "http://203.95.199.55:8081/repository/maven-i4-release/"
+      - "http://203.95.199.55:8081/repository/maven-i4-snapshot/"
+      - "http://203.95.199.55:8081/repository/maven-proxy-i4/"
+      - "http://203.95.199.55:8081/repository/maven-group-i4/"
+    
+    composer_repo: "http://203.95.199.55:8081/repository/composer-proxy-i4/"
+    
+    npm_repos:
+      - "http://203.95.199.55:8081/repository/npm-group-i4/"
+      - "http://203.95.199.55:8081/repository/npm-host-i4/"
+      - "http://203.95.199.55:8081/repository/npm-proxy-i4/"
+
+  tasks:
+    # Task 1: Pull from Final branch
+    - name: Pull latest code from Git
+      kubernetes.core.k8s_exec:
+        namespace: default
+        pod: "{{ pod_name }}"
+        container: web
+        command: |
+          sh -c 'if [ -d "{{ app_path }}/.git" ]; then \
+           cd {{ app_path }} && git reset --hard HEAD && git clean -fd && git checkout {{ git_branch }} && git pull origin {{ git_branch }}; \
+          else \
+           git clone -b {{ git_branch }} https://github.com/yungNita/DevOps_Course.git {{ app_path }}; \
+          fi'
+       
+
+    # Task 2: Configure Composer with custom repo
+    - name: Configure Composer repositories and network settings
+      kubernetes.core.k8s_exec:
+        namespace: default
+        pod: "{{ pod_name }}"
+        container: web
+        command: |
+          sh -c 'cd {{ app_path }} && \
+              composer config -g repo.packagist composer {{ composer_repo }} && \
+              composer config -g secure-http false && \
+              composer config -g process-timeout 2000'
+
+    - name: Install Composer dependencies
+      kubernetes.core.k8s_exec:
+        namespace: default
+        pod: "{{ pod_name }}"
+        container: web
+        command: |
+          sh -c 'cd {{ app_path }} && \
+                 COMPOSER_MEMORY_LIMIT=-1 composer install \
+                 --no-dev \
+                 --optimize-autoloader \
+                 --no-plugins \
+                 --no-scripts \
+                 --prefer-dist \
+                 --ignore-platform-reqs'
+
+    - name: Verify Composer config
+      kubernetes.core.k8s_exec:
+        namespace: default
+        pod: "{{ pod_name }}"
+        container: web
+        command: |
+          sh -c 'cd {{ app_path }} && composer config -g --list'
+      register: composer_config
+
+    - name: Display Composer config
+      debug:
+        var: composer_config.stdout
+                 
+    # Task 3: Configure NPM with custom registries
+    - name: Set up NPM registry
+      kubernetes.core.k8s_exec:
+        namespace: default
+        pod: "{{ pod_name }}"
+        container: web
+        command: |
+          sh -c 'cd {{ app_path }} && \
+                 npm config set registry {{ npm_repos[0] }} && \
+                 npm config set @i4:registry {{ npm_repos[1] }}'
+
+    - name: Install NPM dependencies and build
+      kubernetes.core.k8s_exec:
+        namespace: default
+        pod: "{{ pod_name }}"
+        container: web
+        command: |
+          sh -c 'cd {{ app_path }} && \
+                 npm ci --registry={{ npm_repos[0] }} && \
+                 npm run prod'
+
+    # Task 4: Run tests with SQLite
+    - name: Configure test environment
+      kubernetes.core.k8s_exec:
+        namespace: default
+        pod: "{{ pod_name }}"
+        container: web
+        command: |
+          sh -c 'cd {{ app_path }} && \
+                 cp .env .env.testing && \
+                 echo "DB_CONNECTION=sqlite" >> .env.testing && \
+                 echo "DB_DATABASE=:memory:" >> .env.testing && \
+                 echo "CACHE_DRIVER=array" >> .env.testing && \
+                 echo "SESSION_DRIVER=array" >> .env.testing && \
+                 echo "QUEUE_CONNECTION=sync" >> .env.testing'
+
+    - name: Run PHPUnit tests
+      kubernetes.core.k8s_exec:
+        namespace: default
+        pod: "{{ pod_name }}"
+        container: web
+        command: |
+          sh -c 'cd {{ app_path }} && \
+                 php artisan config:clear && \
+                 php artisan test'
+
+    # Task 5: MySQL Backup
+    - name: Create timestamped MySQL backup
+      kubernetes.core.k8s_exec:
+        namespace: default
+        pod: "{{ pod_name }}"
+        container: mysql
+        command: |
+          sh -c 'mysqldump -u root -pHello@123 yungnita | gzip > /tmp/yungnita_backup_$(date +%Y%m%d_%H%M%S).sql.gz'
+      register: backup_result
+
+    - name: Display backup info
+      debug:
+        msg: "MySQL backup created at /tmp/yungnita_backup_*.sql.gz inside mysql container"
